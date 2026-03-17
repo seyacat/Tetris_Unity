@@ -305,6 +305,10 @@ public class TetrisBoard : MonoBehaviour
         _lockTimer     = 0f;
         _fallTimer     = 0f;
 
+        // Limpiar la referencia antes de ClearLines para que RedrawGrid
+        // no redibuje la pieza fijada sobre las líneas que deben eliminarse.
+        _currentPiece = null;
+
         ClearLines();
         SpawnNewPiece();
     }
