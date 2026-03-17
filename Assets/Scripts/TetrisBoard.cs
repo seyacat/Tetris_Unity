@@ -63,6 +63,9 @@ public class TetrisBoard : MonoBehaviour
     // Grilla: almacena el SpriteRenderer de cada celda ocupada (null = vacío)
     private SpriteRenderer[,] _grid;
 
+    // Colores fijos de la grilla (paralelo a _grid)
+    private Color[,] _gridColors;
+
     // Pool de renderers (se crean al inicio y se reutilizan)
     private SpriteRenderer[,] _renderers;
 
@@ -292,7 +295,10 @@ public class TetrisBoard : MonoBehaviour
         foreach (var cell in _currentPiece.Cells)
         {
             if (IsInBounds(cell))
-                _grid[cell.x, cell.y] = _renderers[cell.x, cell.y];
+            {
+                _grid[cell.x, cell.y]       = _renderers[cell.x, cell.y];
+                _gridColors[cell.x, cell.y] = color;
+            }
         }
 
         _pieceGrounded = false;
@@ -365,7 +371,8 @@ public class TetrisBoard : MonoBehaviour
     {
         for (int col = 0; col < columns; col++)
         {
-            _grid[col, row] = null;
+            _grid[col, row]       = null;
+            _gridColors[col, row] = Color.clear;
         }
     }
 
@@ -373,10 +380,16 @@ public class TetrisBoard : MonoBehaviour
     {
         for (int row = clearedRow; row < rows - 1; row++)
             for (int col = 0; col < columns; col++)
-                _grid[col, row] = _grid[col, row + 1];
+            {
+                _grid[col, row]       = _grid[col, row + 1];
+                _gridColors[col, row] = _gridColors[col, row + 1];
+            }
 
         for (int col = 0; col < columns; col++)
-            _grid[col, rows - 1] = null;
+        {
+            _grid[col, rows - 1]       = null;
+            _gridColors[col, rows - 1] = Color.clear;
+        }
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -413,10 +426,7 @@ public class TetrisBoard : MonoBehaviour
         for (int col = 0; col < columns; col++)
             for (int row = 0; row < rows; row++)
                 if (_grid[col, row] != null)
-                {
-                    // Recuperar color buscando el tipo… guardamos el color directamente
-                    SetRenderer(col, row, _renderers[col, row].color, true);
-                }
+                    SetRenderer(col, row, _gridColors[col, row], true);
 
         // Dibujar pieza activa encima
         if (_currentPiece != null)
@@ -436,8 +446,9 @@ public class TetrisBoard : MonoBehaviour
 
     private void BuildRenderers()
     {
-        _renderers = new SpriteRenderer[columns, rows];
-        _grid      = new SpriteRenderer[columns, rows];
+        _renderers   = new SpriteRenderer[columns, rows];
+        _grid        = new SpriteRenderer[columns, rows];
+        _gridColors  = new Color[columns, rows];
 
         // Origen: centrar el tablero en el GameObject
         float originX = -(columns * blockSize.x) / 2f + blockSize.x / 2f;
@@ -454,7 +465,13 @@ public class TetrisBoard : MonoBehaviour
                     originY + row * blockSize.y,
                     0f
                 );
-                go.transform.localScale = new Vector3(blockSize.x, blockSize.y, 1f);
+                float spriteW = (blockSprite != null) ? blockSprite.bounds.size.x : 1f;
+                float spriteH = (blockSprite != null) ? blockSprite.bounds.size.y : 1f;
+                go.transform.localScale = new Vector3(
+                    blockSize.x / spriteW,
+                    blockSize.y / spriteH,
+                    1f
+                );
 
                 var sr = go.AddComponent<SpriteRenderer>();
                 sr.sprite  = blockSprite;
@@ -494,14 +511,16 @@ public class TetrisBoard : MonoBehaviour
 
         if (_grid == null)
         {
-            _grid      = new SpriteRenderer[columns, rows];
+            _grid       = new SpriteRenderer[columns, rows];
+            _gridColors = new Color[columns, rows];
             BuildRenderers();
         }
 
         for (int col = 0; col < columns; col++)
             for (int row = 0; row < rows; row++)
             {
-                _grid[col, row] = null;
+                _grid[col, row]       = null;
+                _gridColors[col, row] = Color.clear;
                 SetRenderer(col, row, Color.clear, false);
             }
     }
@@ -526,13 +545,14 @@ public class TetrisBoard : MonoBehaviour
     private void OnDrawGizmos()
     {
         Gizmos.color = new Color(1f, 1f, 1f, 0.2f);
-        float originX = -(columns * blockSize.x) / 2f;
-        float originY = -(rows    * blockSize.y) / 2f;
-        Vector3 size  = new Vector3(columns * blockSize.x, rows * blockSize.y, 0f);
-        Vector3 center = transform.position + new Vector3(
-            originX + size.x / 2f,
-            originY + size.y / 2f,
-            0f);
-        Gizmos.DrawWireCube(center, size);
+
+        // localToWorldMatrix ya encapsula posición + rotación + escala (incluyendo parents).
+        // Dibujamos en espacio LOCAL con las dimensiones locales puras: el motor hace el resto.
+        float localW = columns * blockSize.x;
+        float localH = rows    * blockSize.y;
+
+        Gizmos.matrix = transform.localToWorldMatrix;
+        Gizmos.DrawWireCube(Vector3.zero, new Vector3(localW, localH, 0.01f));
+        Gizmos.matrix = Matrix4x4.identity;
     }
 }
