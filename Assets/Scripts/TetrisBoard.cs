@@ -278,7 +278,10 @@ public class TetrisBoard : MonoBehaviour
             _currentPiece = next;
         }
         DrawPiece(_currentPiece);
-        LockPiece();
+        
+        _pieceGrounded = true;
+        _lockTimer = 0f;
+        _fallTimer = 0f;
     }
 
     // ════════════════════════════════════════════════════════════════
