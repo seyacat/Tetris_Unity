@@ -533,9 +533,81 @@ public class TetrisBoard : MonoBehaviour
 
     private void EraseCell(int col, int row)
     {
+        if (_grid[col, row] != null)
+        {
+            SpawnExplosion(_renderers[col, row].transform.position, _gridColors[col, row], _gridSprites[col, row], _renderers[col, row].transform.localScale);
+        }
+
         _grid[col, row]        = null;
         _gridColors[col, row]  = Color.clear;
         _gridSprites[col, row] = null;
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  VFX DE EXPLOSIÓN
+    // ════════════════════════════════════════════════════════════════
+
+    private void SpawnExplosion(Vector3 worldPos, Color color, Sprite sprite, Vector3 baseScale)
+    {
+        if (sprite == null) return;
+
+        Vector3 fragScale = baseScale * 0.5f; // Mitad del tamaño para fingir fragmentos
+        Vector2[] offsets = {
+            new Vector2(-0.25f,  0.25f),
+            new Vector2( 0.25f,  0.25f),
+            new Vector2(-0.25f, -0.25f),
+            new Vector2( 0.25f, -0.25f)
+        };
+
+        for (int i = 0; i < 4; i++)
+        {
+            var frag = new GameObject("BlockFragment");
+            
+            // Posición centrada un poquito en cada esquina
+            frag.transform.position = worldPos + new Vector3(offsets[i].x * blockSize.x, offsets[i].y * blockSize.y, 0f);
+            frag.transform.localScale = fragScale;
+
+            var sr = frag.AddComponent<SpriteRenderer>();
+            sr.sprite = sprite;
+            sr.color = color;
+            sr.sortingOrder = 10;
+
+            // Velocidad aleatoria saliendo disparados
+            Vector3 velocity = new Vector3(Random.Range(-4f, 4f), Random.Range(2f, 6f), 0f);
+            float rotSpeed = Random.Range(-360f, 360f);
+
+            StartCoroutine(AnimateFragment(frag, sr, velocity, rotSpeed));
+        }
+    }
+
+    private IEnumerator AnimateFragment(GameObject frag, SpriteRenderer sr, Vector3 velocity, float rotSpeed)
+    {
+        float duration = 0.6f;
+        float elapsed  = 0f;
+        float gravity  = 15f; 
+
+        Vector3 pos = frag.transform.position;
+        Color startColor = sr.color;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            
+            // Física base (parábola)
+            velocity.y -= gravity * Time.deltaTime;
+            pos += velocity * Time.deltaTime;
+            
+            frag.transform.position = pos;
+            frag.transform.Rotate(0, 0, rotSpeed * Time.deltaTime);
+
+            // Efecto transparencia (Fade)
+            float alpha = Mathf.Lerp(1f, 0f, elapsed / duration);
+            sr.color = new Color(startColor.r, startColor.g, startColor.b, alpha * startColor.a);
+
+            yield return null;
+        }
+
+        Destroy(frag);
     }
 
     private void SpawnNewPiece()
@@ -625,6 +697,10 @@ public class TetrisBoard : MonoBehaviour
     {
         for (int col = 0; col < columns; col++)
         {
+            if (_grid[col, row] != null)
+            {
+                SpawnExplosion(_renderers[col, row].transform.position, _gridColors[col, row], _gridSprites[col, row], _renderers[col, row].transform.localScale);
+            }
             _grid[col, row]        = null;
             _gridColors[col, row]  = Color.clear;
             _gridSprites[col, row] = null;
