@@ -85,6 +85,12 @@ public class TetrisBoard : MonoBehaviour
     // Puntos por líneas eliminadas de una vez (Guideline)
     private static readonly int[] LinePoints = { 0, 100, 300, 500, 800 };
 
+    // Tracking de touch / mouse
+    private Vector2 _pointerStartPos;
+    private Vector2 _dragLastPos;
+    private bool    _isDraggingPointer;
+    private bool    _prevPointerPressed;   // estado del frame anterior para detectar edge
+
     // ════════════════════════════════════════════════════════════════
     //  UNITY LIFECYCLE
     // ════════════════════════════════════════════════════════════════
@@ -163,25 +169,116 @@ public class TetrisBoard : MonoBehaviour
     private void HandleInput()
     {
         var kb = Keyboard.current;
-        if (kb == null) return;
+        if (kb != null)
+        {
+            if (kb.leftArrowKey.wasPressedThisFrame  || kb.aKey.wasPressedThisFrame)
+                TryMove(Vector2Int.left);
 
-        if (kb.leftArrowKey.wasPressedThisFrame  || kb.aKey.wasPressedThisFrame)
-            TryMove(Vector2Int.left);
+            if (kb.rightArrowKey.wasPressedThisFrame || kb.dKey.wasPressedThisFrame)
+                TryMove(Vector2Int.right);
 
-        if (kb.rightArrowKey.wasPressedThisFrame || kb.dKey.wasPressedThisFrame)
-            TryMove(Vector2Int.right);
+            if (kb.downArrowKey.wasPressedThisFrame  || kb.sKey.wasPressedThisFrame)
+                HardDrop();
 
-        if (kb.downArrowKey.wasPressedThisFrame  || kb.sKey.wasPressedThisFrame)
-            HardDrop();
+            if (kb.upArrowKey.wasPressedThisFrame    || kb.wKey.wasPressedThisFrame)
+                TryRotate(1);
 
-        if (kb.upArrowKey.wasPressedThisFrame    || kb.wKey.wasPressedThisFrame)
-            TryRotate(1);
+            if (kb.zKey.wasPressedThisFrame)
+                TryRotate(-1);
 
-        if (kb.zKey.wasPressedThisFrame)
-            TryRotate(-1);
+            if (kb.spaceKey.wasPressedThisFrame)
+                HardDrop();
+        }
 
-        if (kb.spaceKey.wasPressedThisFrame)
-            HardDrop();
+        HandlePointerInput();
+    }
+
+    private void HandlePointerInput()
+    {
+        // Leer estado crudo del puntero activo
+        bool isPressed = false;
+        Vector2 ptrPos = Vector2.zero;
+
+        if (Mouse.current != null)
+        {
+            ptrPos = Mouse.current.position.ReadValue();
+            if (Mouse.current.leftButton.isPressed)
+                isPressed = true;
+        }
+        
+        if (!isPressed && Touchscreen.current != null)
+        {
+            var touch = Touchscreen.current.primaryTouch;
+            if (touch.press.isPressed || touch.phase.ReadValue() == UnityEngine.InputSystem.TouchPhase.Ended)
+            {
+                ptrPos = touch.position.ReadValue();
+                isPressed = touch.press.isPressed;
+            }
+        }
+
+        // Edge detection manual (fiable en todas las plataformas)
+        bool pressStarted  = isPressed  && !_prevPointerPressed;
+        bool pressEnded    = !isPressed && _prevPointerPressed;
+        _prevPointerPressed = isPressed;
+
+        // ── Inicio de gesto ──────────────────────────────────────────
+        if (pressStarted)
+        {
+            Debug.Log($"[TetrisBoard] Drag INICIADO en la posición: {ptrPos}");
+            _pointerStartPos   = ptrPos;
+            _dragLastPos       = ptrPos;
+            _isDraggingPointer = true;
+        }
+
+        // ── Drag activo ───────────────────────────────────────────────
+        if (_isDraggingPointer && isPressed && !pressStarted)
+        {
+            float swipeThresh = Screen.width * 0.06f;
+            float deltaX = ptrPos.x - _dragLastPos.x;
+
+            if (Mathf.Abs(deltaX) >= swipeThresh)
+            {
+                int steps = Mathf.FloorToInt(Mathf.Abs(deltaX) / swipeThresh);
+                int sign  = (int)Mathf.Sign(deltaX);
+
+                for (int i = 0; i < steps; i++)
+                    TryMove(new Vector2Int(sign, 0));
+
+                _dragLastPos.x += steps * swipeThresh * sign;
+            }
+
+            float dropThresh  = Screen.height * 0.12f;
+            float totalDeltaY = ptrPos.y - _pointerStartPos.y;
+
+            if (totalDeltaY < -dropThresh)
+            {
+                float totalDeltaX = Mathf.Abs(ptrPos.x - _pointerStartPos.x);
+                if (Mathf.Abs(totalDeltaY) > totalDeltaX * 1.5f)
+                {
+                    Debug.Log($"[TetrisBoard] HardDrop activado con swipe hacia abajo.");
+                    HardDrop();
+                    _isDraggingPointer = false;
+                }
+            }
+        }
+
+        // ── Fin de gesto ─────────────────────────────────────────────
+        if (_isDraggingPointer && pressEnded)
+        {
+            Debug.Log($"[TetrisBoard] Drag FINALIZADO por soltar input.");
+            _isDraggingPointer = false;
+
+            float tapDistance = Screen.width * 0.04f;
+            if (Vector2.Distance(_pointerStartPos, ptrPos) <= tapDistance)
+            {
+                Debug.Log($"[TetrisBoard] Tap detectado al finalizar drag - Rotando pieza.");
+                TryRotate(1);
+            }
+        }
+
+        // Si no hay input activo y quedó drag colgado, limpiar
+        if (!isPressed)
+            _isDraggingPointer = false;
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -525,13 +622,15 @@ public class TetrisBoard : MonoBehaviour
 
     private void ResetBoard()
     {
-        _score         = 0;
+        _score              = 0;
         OnScoreChanged?.Invoke(_score);
-        _fallTimer     = 0f;
-        _lockTimer     = 0f;
-        _pieceGrounded = false;
-        _currentPiece  = null;
-        _nextPiece     = null;
+        _fallTimer          = 0f;
+        _lockTimer          = 0f;
+        _pieceGrounded      = false;
+        _currentPiece       = null;
+        _nextPiece          = null;
+        _isDraggingPointer  = false;
+        _prevPointerPressed = false;
 
         if (_renderers == null)
         {
