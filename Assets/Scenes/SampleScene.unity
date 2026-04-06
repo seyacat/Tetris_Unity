@@ -1321,7 +1321,7 @@ MonoBehaviour:
   onValueChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_IsOn: 0
+  m_IsOn: 1
 --- !u!1 &973652984
 GameObject:
   m_ObjectHideFlags: 0
@@ -1399,6 +1399,9 @@ MonoBehaviour:
   scoreTexts:
   - {fileID: 1772977576}
   - {fileID: 439644321}
+  mode2Toggle: {fileID: 705644007}
+  piecesBeforePiece8: 10
+  additionalPiecesBeforePiece9: 5
 --- !u!4 &973652986
 Transform:
   m_ObjectHideFlags: 0

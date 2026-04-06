@@ -447,12 +447,95 @@ public class TetrisBoard : MonoBehaviour
         // Sumar 10 puntos por pieza colocada en el suelo
         AddScore(10);
 
+        TetrominoType lockedType = _currentPiece.Type;
+        Vector2Int[]  lockedCells = _currentPiece.Cells;
+
         // Limpiar la referencia antes de ClearLines para que RedrawGrid
         // no redibuje la pieza fijada sobre las líneas que deben eliminarse.
         _currentPiece = null;
 
+        // Efectos especiales (Piezas 8 y 9)
+        ApplySpecialPieceEffects(lockedType, lockedCells);
+
         ClearLines();
         SpawnNewPiece();
+    }
+
+    private void ApplySpecialPieceEffects(TetrominoType type, Vector2Int[] cells)
+    {
+        bool mode2 = mode2Toggle != null && mode2Toggle.isOn;
+
+        if (type == TetrominoType.BigT) // Pieza 8
+        {
+            // Modo 1 y Modo 2: Elimina todos los bloques alrededor de 2 de su bounding box
+            int minX = int.MaxValue, maxX = int.MinValue;
+            int minY = int.MaxValue, maxY = int.MinValue;
+            
+            foreach (var cell in cells)
+            {
+                if (cell.x < minX) minX = cell.x;
+                if (cell.x > maxX) maxX = cell.x;
+                if (cell.y < minY) minY = cell.y;
+                if (cell.y > maxY) maxY = cell.y;
+            }
+
+            // Radio de 2 bloques
+            minX -= 2; maxX += 2;
+            minY -= 2; maxY += 2;
+
+            for (int x = minX; x <= maxX; x++)
+            {
+                for (int y = minY; y <= maxY; y++)
+                {
+                    if (x >= 0 && x < columns && y >= 0 && y < rows)
+                    {
+                        EraseCell(x, y);
+                    }
+                }
+            }
+        }
+        else if (type == TetrominoType.Block2x3) // Pieza 9
+        {
+            if (mode2)
+            {
+                // Modo 2: Elimina todos los bloques de la pantalla
+                for (int x = 0; x < columns; x++)
+                {
+                    for (int y = 0; y < rows; y++)
+                    {
+                        EraseCell(x, y);
+                    }
+                }
+            }
+            else
+            {
+                // Modo 1: Elimina todas las lineas a su nivel y la inferior
+                int minY = int.MaxValue, maxY = int.MinValue;
+                foreach (var cell in cells)
+                {
+                    if (cell.y < minY) minY = cell.y;
+                    if (cell.y > maxY) maxY = cell.y;
+                }
+
+                int lowestLevel = minY - 1;
+                // Lo borramos de arriba hacia abajo para que el colapso (ShiftRowsDown) no nos cambie los índices.
+                for (int y = maxY; y >= lowestLevel; y--)
+                {
+                    if (y >= 0 && y < rows)
+                    {
+                        ClearRow(y);
+                        ShiftRowsDown(y);
+                    }
+                }
+            }
+        }
+    }
+
+    private void EraseCell(int col, int row)
+    {
+        _grid[col, row]        = null;
+        _gridColors[col, row]  = Color.clear;
+        _gridSprites[col, row] = null;
     }
 
     private void SpawnNewPiece()
@@ -733,11 +816,20 @@ public class TetrisBoard : MonoBehaviour
         OnGameEnded?.Invoke();
     }
 
-    private static TetrominoType RandomType()
+    private TetrominoType RandomType()
     {
-        // Solo retornamos del 0 al 6 (las 7 piezas estándar de Tetris).
-        // La 8 (BigT) y 9 (Block2x3) quedan reservadas solo para el Mode 2.
-        return (TetrominoType)Random.Range(0, 7);
+        bool mode2 = mode2Toggle != null && mode2Toggle.isOn;
+        if (mode2)
+        {
+            // En Modo 2: la 8 (BigT) y 9 (Block2x3) NO salen al azar, solo programadas.
+            return (TetrominoType)Random.Range(0, 7);
+        }
+        else
+        {
+            // En Modo 1: todas las piezas juegan al azar desde el inicio.
+            var values = System.Enum.GetValues(typeof(TetrominoType));
+            return (TetrominoType)values.GetValue(Random.Range(0, values.Length));
+        }
     }
 
     // ════════════════════════════════════════════════════════════════
