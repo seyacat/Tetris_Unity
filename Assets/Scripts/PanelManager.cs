@@ -11,10 +11,10 @@ public class PanelManager : MonoBehaviour
 
     private void Start()
     {
-        InitializePanels();
+        StartCoroutine(InitializePanels());
     }
 
-    private void InitializePanels()
+    private IEnumerator InitializePanels()
     {
         for (int i = 0; i < panels.Length; i++)
         {
@@ -24,18 +24,31 @@ public class PanelManager : MonoBehaviour
                 continue;
             }
 
-            if (i == 0)
+            panels[i].gameObject.SetActive(false);
+            panels[i].alpha = 0f;
+            panels[i].interactable = false;
+            panels[i].blocksRaycasts = false;
+        }
+
+        if (panels.Length > 0 && panels[0] != null)
+        {
+            panels[0].gameObject.SetActive(true);
+            isTransitioning = true;
+
+            float elapsedTime = 0f;
+            while (elapsedTime < FADE_DURATION)
             {
-                panels[i].alpha = 1f;
-                panels[i].interactable = true;
-                panels[i].blocksRaycasts = true;
+                elapsedTime += Time.deltaTime;
+                float progress = elapsedTime / FADE_DURATION;
+                
+                panels[0].alpha = Mathf.Lerp(0f, 1f, progress);
+                yield return null;
             }
-            else
-            {
-                panels[i].alpha = 0f;
-                panels[i].interactable = false;
-                panels[i].blocksRaycasts = false;
-            }
+
+            panels[0].alpha = 1f;
+            panels[0].interactable = true;
+            panels[0].blocksRaycasts = true;
+            isTransitioning = false;
         }
     }
 
