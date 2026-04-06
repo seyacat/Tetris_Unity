@@ -91,7 +91,8 @@ public class TetrisBoard : MonoBehaviour
 
     private void Awake()
     {
-        BuildRenderers();
+        if (_renderers == null)
+            BuildRenderers();
     }
 
     private void Update()
@@ -153,6 +154,7 @@ public class TetrisBoard : MonoBehaviour
     public bool IsRunning => _isRunning;
     public bool IsPaused  => _isPaused;
     public bool IsOver    => _isGameOver;
+    public TetrisPiece NextPiece => _nextPiece;
 
     // ════════════════════════════════════════════════════════════════
     //  INPUT
@@ -170,13 +172,7 @@ public class TetrisBoard : MonoBehaviour
             TryMove(Vector2Int.right);
 
         if (kb.downArrowKey.wasPressedThisFrame  || kb.sKey.wasPressedThisFrame)
-        {
-            if (!TryMove(Vector2Int.down))
-            {
-                _pieceGrounded = true;
-                _lockTimer     = 0f;
-            }
-        }
+            HardDrop();
 
         if (kb.upArrowKey.wasPressedThisFrame    || kb.wKey.wasPressedThisFrame)
             TryRotate(1);
@@ -447,7 +443,10 @@ public class TetrisBoard : MonoBehaviour
         var sr = _renderers[col, row];
         sr.enabled = visible;
         sr.color   = color;
-        if (sprite != null) sr.sprite = sprite;
+        if (sprite != null)
+            sr.sprite = sprite;
+        else if (!visible)
+            sr.sprite = null;
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -456,6 +455,14 @@ public class TetrisBoard : MonoBehaviour
 
     private void BuildRenderers()
     {
+        if (_renderers != null) return;
+
+        // Limpiar cualquier objeto huérfano para evitar piezas fantasmas
+        for (int i = transform.childCount - 1; i >= 0; i--)
+        {
+            Destroy(transform.GetChild(i).gameObject);
+        }
+
         _renderers   = new SpriteRenderer[columns, rows];
         _grid        = new SpriteRenderer[columns, rows];
         _gridColors  = new Color[columns, rows];
@@ -464,6 +471,10 @@ public class TetrisBoard : MonoBehaviour
         // Origen: centrar el tablero en el GameObject
         float originX = -(columns * blockSize.x) / 2f + blockSize.x / 2f;
         float originY = -(rows    * blockSize.y) / 2f + blockSize.y / 2f;
+
+        Sprite defaultSprite = (pieceSprites != null && pieceSprites.Length > 0) ? pieceSprites[0] : null;
+        float spriteW = (defaultSprite != null) ? defaultSprite.bounds.size.x : 1f;
+        float spriteH = (defaultSprite != null) ? defaultSprite.bounds.size.y : 1f;
 
         for (int col = 0; col < columns; col++)
         {
@@ -476,9 +487,6 @@ public class TetrisBoard : MonoBehaviour
                     originY + row * blockSize.y,
                     0f
                 );
-                Sprite defaultSprite = (pieceSprites != null && pieceSprites.Length > 0) ? pieceSprites[0] : null;
-                float spriteW = (defaultSprite != null) ? defaultSprite.bounds.size.x : 1f;
-                float spriteH = (defaultSprite != null) ? defaultSprite.bounds.size.y : 1f;
                 go.transform.localScale = new Vector3(
                     blockSize.x / spriteW,
                     blockSize.y / spriteH,
@@ -486,7 +494,7 @@ public class TetrisBoard : MonoBehaviour
                 );
 
                 var sr = go.AddComponent<SpriteRenderer>();
-                sr.sprite  = pieceSprites != null && pieceSprites.Length > 0 ? pieceSprites[0] : null;
+                sr.sprite  = null;
                 sr.enabled = false;
 
                 _renderers[col, row] = sr;
@@ -515,17 +523,15 @@ public class TetrisBoard : MonoBehaviour
     private void ResetBoard()
     {
         _score         = 0;
+        OnScoreChanged?.Invoke(_score);
         _fallTimer     = 0f;
         _lockTimer     = 0f;
         _pieceGrounded = false;
         _currentPiece  = null;
         _nextPiece     = null;
 
-        if (_grid == null)
+        if (_renderers == null)
         {
-            _grid        = new SpriteRenderer[columns, rows];
-            _gridColors  = new Color[columns, rows];
-            _gridSprites = new Sprite[columns, rows];
             BuildRenderers();
         }
 
