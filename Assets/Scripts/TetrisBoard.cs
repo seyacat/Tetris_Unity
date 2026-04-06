@@ -66,6 +66,9 @@ public class TetrisBoard : MonoBehaviour
     public int piecesBeforePiece8 = 10;
     public int additionalPiecesBeforePiece9 = 5;
 
+    [Header("Audio")]
+    public AudioSource explosionSound;
+
     // ════════════════════════════════════════════════════════════════
     //  ESTADO INTERNO
     // ════════════════════════════════════════════════════════════════
@@ -455,13 +458,13 @@ public class TetrisBoard : MonoBehaviour
         _currentPiece = null;
 
         // Efectos especiales (Piezas 8 y 9)
-        ApplySpecialPieceEffects(lockedType, lockedCells);
+        bool playedSpecialAudio = ApplySpecialPieceEffects(lockedType, lockedCells);
 
-        ClearLines();
+        ClearLines(playedSpecialAudio);
         SpawnNewPiece();
     }
 
-    private void ApplySpecialPieceEffects(TetrominoType type, Vector2Int[] cells)
+    private bool ApplySpecialPieceEffects(TetrominoType type, Vector2Int[] cells)
     {
         bool mode2 = mode2Toggle != null && mode2Toggle.isOn;
 
@@ -529,6 +532,16 @@ public class TetrisBoard : MonoBehaviour
                 }
             }
         }
+        else
+        {
+            return false; // No especial
+        }
+
+        // Si entró a los if de las piezas 8 y 9
+        if (explosionSound != null)
+            explosionSound.Play();
+
+        return true;
     }
 
     private void EraseCell(int col, int row)
@@ -663,7 +676,7 @@ public class TetrisBoard : MonoBehaviour
     //  LÍNEAS
     // ════════════════════════════════════════════════════════════════
 
-    private void ClearLines()
+    private void ClearLines(bool skipAudio = false)
     {
         int linesCleared = 0;
         for (int row = rows - 1; row >= 0; row--)
@@ -679,6 +692,9 @@ public class TetrisBoard : MonoBehaviour
 
         if (linesCleared > 0)
         {
+            if (!skipAudio && explosionSound != null)
+                explosionSound.Play();
+
             AddScore(linesCleared * 100);
             OnLineClear?.Invoke(linesCleared);
         }
