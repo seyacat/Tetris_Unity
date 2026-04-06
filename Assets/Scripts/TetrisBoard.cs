@@ -60,6 +60,12 @@ public class TetrisBoard : MonoBehaviour
     [Header("UI Score Displays")]
     public Text[] scoreTexts;
 
+    [Header("Modo de Juego")]
+    [Tooltip("Activa para jugar el Modo 2 (Piezas 8 y 9 programadas)")]
+    public Toggle mode2Toggle;
+    public int piecesBeforePiece8 = 10;
+    public int additionalPiecesBeforePiece9 = 5;
+
     // ════════════════════════════════════════════════════════════════
     //  ESTADO INTERNO
     // ════════════════════════════════════════════════════════════════
@@ -85,6 +91,8 @@ public class TetrisBoard : MonoBehaviour
     private float _fallTimer;
     private float _lockTimer;
     private bool  _pieceGrounded;
+
+    private int _spawnedPieceCount;
 
     // Puntos por líneas eliminadas de una vez (Guideline)
     private static readonly int[] LinePoints = { 0, 100, 300, 500, 800 };
@@ -449,14 +457,41 @@ public class TetrisBoard : MonoBehaviour
 
     private void SpawnNewPiece()
     {
-        // Si hay pieza siguiente la usamos; si no, generamos una al azar
+        bool mode2 = mode2Toggle != null && mode2Toggle.isOn;
+
+        int currentPieceNumber = _spawnedPieceCount + 1;
+        int piece8Num = piecesBeforePiece8 + 1;
+        int piece9Num = piece8Num + additionalPiecesBeforePiece9;
+        int endGameNum = piece9Num + 1;
+
+        if (mode2 && currentPieceNumber == endGameNum)
+        {
+            EndGame();
+            return;
+        }
+
+        TetrominoType nextType = RandomType();
+        int nextPieceNumber = currentPieceNumber + 1;
+
+        if (mode2)
+        {
+            if (nextPieceNumber == piece8Num)
+                nextType = TetrominoType.BigT;
+            else if (nextPieceNumber == piece9Num)
+                nextType = TetrominoType.Block2x3;
+        }
+
+        // Si hay pieza siguiente la usamos; si no, generamos según las reglas
         var type = (_nextPiece != null)
             ? _nextPiece.Type
-            : RandomType();
+            : (mode2 && currentPieceNumber == piece8Num ? TetrominoType.BigT 
+               : (mode2 && currentPieceNumber == piece9Num ? TetrominoType.Block2x3 : RandomType()));
+
+        _spawnedPieceCount++;
 
         var spawnPos   = new Vector2Int(columns / 2, rows - 2);
         _currentPiece  = new TetrisPiece(type, spawnPos);
-        _nextPiece     = new TetrisPiece(RandomType(), spawnPos);
+        _nextPiece     = new TetrisPiece(nextType, spawnPos);
 
         if (!IsValidPosition(_currentPiece))
         {
@@ -664,6 +699,7 @@ public class TetrisBoard : MonoBehaviour
         _nextPiece          = null;
         _isDraggingPointer  = false;
         _prevPointerPressed = false;
+        _spawnedPieceCount  = 0;
 
         if (_renderers == null)
         {
@@ -699,8 +735,9 @@ public class TetrisBoard : MonoBehaviour
 
     private static TetrominoType RandomType()
     {
-        var values = System.Enum.GetValues(typeof(TetrominoType));
-        return (TetrominoType)values.GetValue(Random.Range(0, values.Length));
+        // Solo retornamos del 0 al 6 (las 7 piezas estándar de Tetris).
+        // La 8 (BigT) y 9 (Block2x3) quedan reservadas solo para el Mode 2.
+        return (TetrominoType)Random.Range(0, 7);
     }
 
     // ════════════════════════════════════════════════════════════════
