@@ -287,33 +287,38 @@ public class TetrisBoard : MonoBehaviour
 
     private void HandleFall()
     {
-        _fallTimer += Time.deltaTime;
+        // 1. Validar continuamente el estado de Grounded (cubre deslizamientos y rotaciones)
+        bool canMoveDown = IsValidPosition(_currentPiece.WithOffset(Vector2Int.down));
+        
+        if (canMoveDown)
+        {
+            _pieceGrounded = false;
+        }
+        else if (!_pieceGrounded)
+        {
+            _pieceGrounded = true;
+            _lockTimer = 0f;
+        }
 
+        // 2. Caída por gravedad (intervalos regulares)
+        _fallTimer += Time.deltaTime;
         if (_fallTimer >= fallInterval)
         {
             _fallTimer = 0f;
-            if (!TryMove(Vector2Int.down))
+            if (canMoveDown)
             {
-                if (_pieceGrounded)
-                {
-                    _lockTimer += Time.deltaTime;
-                    if (_lockTimer >= lockDelay)
-                        LockPiece();
-                }
-                else
+                TryMove(Vector2Int.down);
+                
+                // Re-evaluar si justo aterrizó tras caer
+                if (!IsValidPosition(_currentPiece.WithOffset(Vector2Int.down)))
                 {
                     _pieceGrounded = true;
-                    _lockTimer     = 0f;
+                    _lockTimer = 0f;
                 }
-            }
-            else
-            {
-                _pieceGrounded = false;
-                _lockTimer     = 0f;
             }
         }
 
-        // Lock delay independiente del timer de caída
+        // 3. Temporizador de fijación (Lock Delay) sobre suelo firme
         if (_pieceGrounded)
         {
             _lockTimer += Time.deltaTime;
