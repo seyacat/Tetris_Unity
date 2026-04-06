@@ -28,8 +28,8 @@ public class TetrisBoard : MonoBehaviour
     // ════════════════════════════════════════════════════════════════
 
     [Header("Visuales")]
-    [Tooltip("Sprite que se usa para dibujar cada bloque del tablero.")]
-    public Sprite blockSprite;
+    [Tooltip("9 sprites en orden: I, O, T, S, Z, J, L, BigT, Block2x3. Si un slot queda vacío se usa el primero.")]
+    public Sprite[] pieceSprites = new Sprite[9];
 
     [Header("Dimensiones del tablero")]
     [Min(4)]  public int rows    = 20;
@@ -63,8 +63,9 @@ public class TetrisBoard : MonoBehaviour
     // Grilla: almacena el SpriteRenderer de cada celda ocupada (null = vacío)
     private SpriteRenderer[,] _grid;
 
-    // Colores fijos de la grilla (paralelo a _grid)
-    private Color[,] _gridColors;
+    // Colores y sprites fijos de la grilla (paralelos a _grid)
+    private Color[,]  _gridColors;
+    private Sprite[,] _gridSprites;
 
     // Pool de renderers (se crean al inicio y se reutilizan)
     private SpriteRenderer[,] _renderers;
@@ -291,13 +292,14 @@ public class TetrisBoard : MonoBehaviour
     private void LockPiece()
     {
         // Fijar los colores de la pieza en la grilla permanente
-        Color color = TetrisData.Colors[(int)_currentPiece.Type];
+        Sprite sprite = GetPieceSprite(_currentPiece.Type);
         foreach (var cell in _currentPiece.Cells)
         {
             if (IsInBounds(cell))
             {
-                _grid[cell.x, cell.y]       = _renderers[cell.x, cell.y];
-                _gridColors[cell.x, cell.y] = color;
+                _grid[cell.x, cell.y]        = _renderers[cell.x, cell.y];
+                _gridColors[cell.x, cell.y]  = Color.white;
+                _gridSprites[cell.x, cell.y] = sprite;
             }
         }
 
@@ -375,8 +377,9 @@ public class TetrisBoard : MonoBehaviour
     {
         for (int col = 0; col < columns; col++)
         {
-            _grid[col, row]       = null;
-            _gridColors[col, row] = Color.clear;
+            _grid[col, row]        = null;
+            _gridColors[col, row]  = Color.clear;
+            _gridSprites[col, row] = null;
         }
     }
 
@@ -385,14 +388,16 @@ public class TetrisBoard : MonoBehaviour
         for (int row = clearedRow; row < rows - 1; row++)
             for (int col = 0; col < columns; col++)
             {
-                _grid[col, row]       = _grid[col, row + 1];
-                _gridColors[col, row] = _gridColors[col, row + 1];
+                _grid[col, row]        = _grid[col, row + 1];
+                _gridColors[col, row]  = _gridColors[col, row + 1];
+                _gridSprites[col, row] = _gridSprites[col, row + 1];
             }
 
         for (int col = 0; col < columns; col++)
         {
-            _grid[col, rows - 1]       = null;
-            _gridColors[col, rows - 1] = Color.clear;
+            _grid[col, rows - 1]        = null;
+            _gridColors[col, rows - 1]  = Color.clear;
+            _gridSprites[col, rows - 1] = null;
         }
     }
 
@@ -402,10 +407,10 @@ public class TetrisBoard : MonoBehaviour
 
     private void DrawPiece(TetrisPiece piece)
     {
-        Color color = TetrisData.Colors[(int)piece.Type];
+        Sprite sprite = GetPieceSprite(piece.Type);
         foreach (var cell in piece.Cells)
             if (IsInBounds(cell))
-                SetRenderer(cell.x, cell.y, color, true);
+                SetRenderer(cell.x, cell.y, Color.white, true, sprite);
     }
 
     private void ErasePiece(TetrisPiece piece)
@@ -430,18 +435,19 @@ public class TetrisBoard : MonoBehaviour
         for (int col = 0; col < columns; col++)
             for (int row = 0; row < rows; row++)
                 if (_grid[col, row] != null)
-                    SetRenderer(col, row, _gridColors[col, row], true);
+                    SetRenderer(col, row, _gridColors[col, row], true, _gridSprites[col, row]);
 
         // Dibujar pieza activa encima
         if (_currentPiece != null)
             DrawPiece(_currentPiece);
     }
 
-    private void SetRenderer(int col, int row, Color color, bool visible)
+    private void SetRenderer(int col, int row, Color color, bool visible, Sprite sprite = null)
     {
         var sr = _renderers[col, row];
         sr.enabled = visible;
         sr.color   = color;
+        if (sprite != null) sr.sprite = sprite;
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -453,6 +459,7 @@ public class TetrisBoard : MonoBehaviour
         _renderers   = new SpriteRenderer[columns, rows];
         _grid        = new SpriteRenderer[columns, rows];
         _gridColors  = new Color[columns, rows];
+        _gridSprites = new Sprite[columns, rows];
 
         // Origen: centrar el tablero en el GameObject
         float originX = -(columns * blockSize.x) / 2f + blockSize.x / 2f;
@@ -469,8 +476,9 @@ public class TetrisBoard : MonoBehaviour
                     originY + row * blockSize.y,
                     0f
                 );
-                float spriteW = (blockSprite != null) ? blockSprite.bounds.size.x : 1f;
-                float spriteH = (blockSprite != null) ? blockSprite.bounds.size.y : 1f;
+                Sprite defaultSprite = (pieceSprites != null && pieceSprites.Length > 0) ? pieceSprites[0] : null;
+                float spriteW = (defaultSprite != null) ? defaultSprite.bounds.size.x : 1f;
+                float spriteH = (defaultSprite != null) ? defaultSprite.bounds.size.y : 1f;
                 go.transform.localScale = new Vector3(
                     blockSize.x / spriteW,
                     blockSize.y / spriteH,
@@ -478,7 +486,7 @@ public class TetrisBoard : MonoBehaviour
                 );
 
                 var sr = go.AddComponent<SpriteRenderer>();
-                sr.sprite  = blockSprite;
+                sr.sprite  = pieceSprites != null && pieceSprites.Length > 0 ? pieceSprites[0] : null;
                 sr.enabled = false;
 
                 _renderers[col, row] = sr;
@@ -515,18 +523,30 @@ public class TetrisBoard : MonoBehaviour
 
         if (_grid == null)
         {
-            _grid       = new SpriteRenderer[columns, rows];
-            _gridColors = new Color[columns, rows];
+            _grid        = new SpriteRenderer[columns, rows];
+            _gridColors  = new Color[columns, rows];
+            _gridSprites = new Sprite[columns, rows];
             BuildRenderers();
         }
 
         for (int col = 0; col < columns; col++)
             for (int row = 0; row < rows; row++)
             {
-                _grid[col, row]       = null;
-                _gridColors[col, row] = Color.clear;
+                _grid[col, row]        = null;
+                _gridColors[col, row]  = Color.clear;
+                _gridSprites[col, row] = null;
                 SetRenderer(col, row, Color.clear, false);
             }
+    }
+
+    private Sprite GetPieceSprite(TetrominoType type)
+    {
+        if (pieceSprites == null) return null;
+        int index = (int)type;
+        if (index < pieceSprites.Length && pieceSprites[index] != null)
+            return pieceSprites[index];
+        // Fallback al primer sprite disponible
+        return pieceSprites.Length > 0 ? pieceSprites[0] : null;
     }
 
     private void TriggerGameOver()

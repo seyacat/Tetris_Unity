@@ -5,7 +5,9 @@ using UnityEngine;
 /// </summary>
 public enum TetrominoType
 {
-    I, O, T, S, Z, J, L
+    I, O, T, S, Z, J, L,
+    BigT,      // T de 5 cubos
+    Block2x3   // Bloque 2×3 (6 cubos)
 }
 
 /// <summary>
@@ -31,6 +33,16 @@ public static class TetrisData
         new Vector2Int[] { new(-1,1), new(-1,0), new(0,0), new(1,0) },
         // L
         new Vector2Int[] { new(1,1), new(-1,0), new(0,0), new(1,0) },
+        // BigT  (T de 5 cubos)
+        //   X X X
+        //     X
+        //     X
+        new Vector2Int[] { new(-1,1), new(0,1), new(1,1), new(0,0), new(0,-1) },
+        // Block2x3  (2×3, 6 cubos)
+        //   X X
+        //   X X
+        //   X X
+        new Vector2Int[] { new(0,1), new(1,1), new(0,0), new(1,0), new(0,-1), new(1,-1) },
     };
 
     // Colores estándar Tetris Guideline
@@ -43,6 +55,8 @@ public static class TetrisData
         new Color(1.00f, 0.15f, 0.15f), // Z - Red
         new Color(0.00f, 0.27f, 1.00f), // J - Blue
         new Color(1.00f, 0.55f, 0.00f), // L - Orange
+        new Color(1.00f, 0.40f, 0.70f), // BigT    - Pink
+        new Color(0.20f, 0.90f, 0.60f), // Block2x3 - Mint
     };
 
     // Wall kick data (SRS - Super Rotation System)

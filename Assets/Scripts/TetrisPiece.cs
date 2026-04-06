@@ -20,7 +20,7 @@ public class TetrisPiece
         Type     = type;
         Position = spawnPosition;
         Rotation = 0;
-        Cells    = new Vector2Int[4];
+        Cells    = new Vector2Int[TetrisData.Cells[(int)type].Length];
         RecalculateCells();
     }
 
@@ -57,7 +57,7 @@ public class TetrisPiece
     private void RecalculateCells()
     {
         Vector2Int[] template = TetrisData.Cells[(int)Type];
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < template.Length; i++)
             Cells[i] = Position + Rotate(template[i], Rotation);
     }
 
