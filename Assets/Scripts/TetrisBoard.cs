@@ -2,6 +2,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 /// <summary>
 /// Tablero principal de Tetris.
@@ -55,6 +56,9 @@ public class TetrisBoard : MonoBehaviour
     public UnityEvent         OnGameEnded;
     public UnityEvent<int>    OnLineClear;        // parámetro: líneas eliminadas
     public UnityEvent<int>    OnScoreChanged;     // parámetro: puntaje total
+
+    [Header("UI Score Displays")]
+    public Text[] scoreTexts;
 
     // ════════════════════════════════════════════════════════════════
     //  ESTADO INTERNO
@@ -150,6 +154,30 @@ public class TetrisBoard : MonoBehaviour
     {
         if (!_isRunning) return;
         TriggerGameOver();
+    }
+
+    private void AddScore(int points)
+    {
+        _score += points;
+        UpdateScoreUI();
+    }
+
+    private void ResetScore()
+    {
+        _score = 0;
+        UpdateScoreUI();
+    }
+
+    private void UpdateScoreUI()
+    {
+        if (scoreTexts != null)
+        {
+            foreach (var t in scoreTexts)
+            {
+                if (t != null) t.text = _score.ToString();
+            }
+        }
+        OnScoreChanged?.Invoke(_score);
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -408,6 +436,9 @@ public class TetrisBoard : MonoBehaviour
         _lockTimer     = 0f;
         _fallTimer     = 0f;
 
+        // Sumar 10 puntos por pieza colocada en el suelo
+        AddScore(10);
+
         // Limpiar la referencia antes de ClearLines para que RedrawGrid
         // no redibuje la pieza fijada sobre las líneas que deben eliminarse.
         _currentPiece = null;
@@ -458,10 +489,8 @@ public class TetrisBoard : MonoBehaviour
 
         if (linesCleared > 0)
         {
-            int points = LinePoints[Mathf.Min(linesCleared, 4)];
-            _score    += points;
+            AddScore(linesCleared * 100);
             OnLineClear?.Invoke(linesCleared);
-            OnScoreChanged?.Invoke(_score);
         }
 
         RedrawGrid();
@@ -627,8 +656,7 @@ public class TetrisBoard : MonoBehaviour
 
     private void ResetBoard()
     {
-        _score              = 0;
-        OnScoreChanged?.Invoke(_score);
+        ResetScore();
         _fallTimer          = 0f;
         _lockTimer          = 0f;
         _pieceGrounded      = false;
